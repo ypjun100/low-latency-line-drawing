@@ -6,6 +6,12 @@ class Line: NSObject {
     // The live line.
     private var points = [LinePoint]()
 
+    /*
+        펜슬은 아이패드로 데이터를 수시로 전송하지만 통신 지연으로 제때 데이터를 전송하지 못할 수 있음.
+        그래서 전송받지 못한 값들을 estimation 값으로 대채한뒤, 다음 터치 이벤트 수신시 받지 못한 데이터를 받음.
+        이때 받지 못한 데이터는 estimationUpdateIndex에 누락된 데이터의 인덱스를 포함하여 해당 인덱스를 가지고
+        누락된 값을 실제 값으로 대체함
+     */
     // Use the estimation index of the touch to track points awaiting updates.
     private var pointsWaitingForUpdatesByEstimationIndex = [NSNumber: LinePoint]()
 
@@ -52,14 +58,25 @@ class Line: NSObject {
         return updateRect
     }
 
+    /*
+        type를 가진 포인트들은 삭제하고, 삭제된 포인트들을 rect 형태로 union하여 반환
+     */
     func removePointsWithType(_ type: LinePoint.PointType) -> CGRect {
         var updateRect = CGRect.null
         var priorPoint: LinePoint?
 
+        // filter는 함수의 반환값이 true인 요소만 추출하여 업데이트
         points = points.filter { point in
+            /*
+             contains()는 type이 해당 point의 옵션에 포함되어 있다면 true를 반환
+             만약, 현재 포인트가 type 옵션을 포함하고 있다면 keepPoint에 false를 저장하고 반환하여 filter에 의해
+             해당 포인트가 포함되지 않게 해줌
+             따라서, keepPoint는 해당 포인트를 유지할지에 대한 여부를 저장하는 변수로, 만약 해당 포인트가 type을
+             포함한다면 결과인 updateRect에 제외하고, 그렇지 않다면 포함하는 형태임
+             */
             let keepPoint = !point.pointType.contains(type)
 
-            if !keepPoint {
+            if !keepPoint { // 만약 제거해야 할 포인트라면 실행
                 var rect = self.updateRectForLinePoint(point)
 
                 if let priorPoint = priorPoint {
@@ -192,7 +209,7 @@ class Line: NSObject {
 
         // The negative magnitude ensures an outset rectangle.
         let magnitude = -3 * point.magnitude - 2
-        rect = rect.insetBy(dx: magnitude, dy: magnitude)
+        rect = rect.insetBy(dx: magnitude, dy: magnitude) // insetBy는 rect의 사이즈에서 dx, dy 만큼 크기를 줄인 rect를 반환 (만약 음수일 경우 크기를 키움)
 
         return rect
     }
@@ -275,13 +292,18 @@ class Line: NSObject {
 class LinePoint: NSObject {
     // MARK: Types
 
+    /*
+        OptionSet은 옵션들의 집합으로 OptionSet 내의 rawValue의 값으로 옵션을 나타냄
+        옵션 값은 2진수로 표시하며, 0001, 0010, 0100, 1000 등과 같이 표시함
+        이때 OptionSet은 여러개의 옵션값을 가질 수 있음 ex) 0101, 1101...
+     */
     struct PointType: OptionSet {
         // MARK: Properties
 
         let rawValue: Int
 
         // MARK: Options
-
+        // 시프트 연산자를 통해 옵션값을 나타냄
         static let standard = PointType(rawValue: 0)
         static let coalesced = PointType(rawValue: 1 << 0)
         static let predicted = PointType(rawValue: 1 << 1)

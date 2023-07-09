@@ -38,6 +38,7 @@ class ViewController: UIViewController, UIPencilInteractionDelegate {
     override func viewDidLoad() {
         super.viewDidLoad()
         canvasView.addSubview(reticleView)
+        view.isMultipleTouchEnabled = true
         
         // Start with debug drawing turned on.
         toggleDebugDrawing(sender: debugButton)
@@ -51,7 +52,11 @@ class ViewController: UIViewController, UIPencilInteractionDelegate {
     }
 
     // MARK: Touch Handling
-
+    /*
+        만약 뷰가 multiple touches 입력이 가능하면, touchesBegan, Moved, Ended에 touches에는 여러 개의 touch들이 들어올 수 있음
+        사용자의 터치가 시작될 때 해당 터치에 대한 정보를 담은 UITouch를 메모리 내에 생성 후, 터치가 이동될 때 새로운 UITouch를 생성하는 것이 아닌
+        기존에 생성된 메모리 내의 정보가 바뀜. 따라서 현재 터치에 대한 touchesBegan, Moved, Ended의 파라미터 UITouch는 동일한 주소값을 가짐
+     */
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         canvasView.drawTouches(touches, withEvent: event)
 
@@ -111,6 +116,7 @@ class ViewController: UIViewController, UIPencilInteractionDelegate {
         canvasView.updateEstimatedPropertiesForTouches(touches)
     }
 
+    
     // MARK: Actions
 
     @IBAction private func clearView(sender: Any) {

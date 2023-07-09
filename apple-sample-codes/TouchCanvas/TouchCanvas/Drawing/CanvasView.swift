@@ -30,7 +30,7 @@ class CanvasView: UIView {
         in accessing the properties of the touch used as a key in the map table. `UITouch` properties should
         be accessed in `NSResponder` callbacks and methods called from them.
     */
-    private let activeLines: NSMapTable<UITouch, Line> = NSMapTable.strongToStrongObjects()
+    private let activeLines: NSMapTable<UITouch, Line> = NSMapTable.strongToStrongObjects() // UITouch의 주소값을 Key로 설정
 
     /**
         Holds a map of `UITouch` objects to `Line` objects whose touch has ended but still has points awaiting
@@ -119,7 +119,8 @@ class CanvasView: UIView {
         var updateRect = CGRect.null
 
         for touch in touches {
-            // Retrieve a line from `activeLines`. If no line exists, create one.
+            //  Retrieve a line from `activeLines`. If no line exists, create one.
+            //  터치가 종료되지 않은 터치의 경우 생성하고 이동하고 제거될 때까지 동일한 주소값을 가지므로, 해당 주소값을 activeLines의 Key값으로 활용
             let line: Line = activeLines.object(forKey: touch) ?? addActiveLineForTouch(touch)
 
             /*
@@ -133,6 +134,13 @@ class CanvasView: UIView {
                 Incorporate coalesced touch data. The data in the last touch in the returned array will match
                 the data of the touch supplied to `coalescedTouchesForTouch(_:)`
             */
+            /**
+                애플펜슬은 터치이벤트에 대한 정보를 240Hz의 주기로 전송하지만, UIKit은 아이패드를 프로를 제외한 기기에서 터치이벤트를
+                60Hz의 주기로 수신함 따라서, 애플펜슬에서 240번 데이터를 보내면, UIKit에서는 60번 밖에 받지 못하므로, 나머지
+                손실된 포인트들을 coalescedTouches()를 통해 가져와, 정밀한 드로잉 데이터가 필요할 때 해당 기능을 사용하여 손실을 보완함.
+                `대신 이를 처리하기 위한 오버헤드가 발생할 수 있음`
+                https://velog.io/@panther222128/Getting-High-Fidelity-Input-with-Coalesced-Touches
+             **/
             let coalescedTouches = event?.coalescedTouches(for: touch) ?? []
             let coalescedRect = addPointsOfType(.coalesced, for: coalescedTouches, to: line, in: updateRect)
             updateRect = updateRect.union(coalescedRect)
@@ -143,6 +151,12 @@ class CanvasView: UIView {
                 Points derived from predicted touches should be removed from the line at the next event for
                 this touch.
             */
+            /*
+                필기 레이턴시를 줄이기 위한 필기 예측 함수 사용. 계속되는 직선이나 곡선에 대한 예측을 할 수 있지만 갑자기 회전이
+                변경되는 부분은 예측 정확도가 떨어질 수 밖에 없음. 따라서 예측 후 실제 펜슬이 지나간 후에는 예측한 포인트들을
+                삭제해야 함.
+                http://yoonbumtae.com/?p=4009 - 레이턴시 줄이기 참고
+             */
             let predictedTouches = event?.predictedTouches(for: touch) ?? []
             let predictedRect = addPointsOfType(.predicted, for: predictedTouches, to: line, in: updateRect)
             updateRect = updateRect.union(predictedRect)
